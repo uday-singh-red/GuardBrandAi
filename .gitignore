@@ -1,0 +1,12 @@
+# Node.js
+node-backend/node_modules/
+node-backend/.env
+
+# Python Virtual Environment & Cache
+python-engine/venv/
+python-engine/__pycache__/
+python-engine/*.pyc
+
+# OS Files
+.DS_Store
+Thumbs.db
