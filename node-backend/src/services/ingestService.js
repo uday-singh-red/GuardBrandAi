@@ -1,23 +1,56 @@
-// src/services/ingestService.js
 const fs = require('fs');
-const pdfParse = require('pdf-parse');
+const PDFParser = require('pdf2json');
 const GuidelineChunk = require('../models/GuidelineChunk');
 const { generateEmbedding } = require('./geminiService');
 const { createChunks } = require('../utils/chunker');
 
 /**
- * PDF file ko process karke chunks banata hai aur MongoDB mein save karta hai.
- * @param {string} filePath - Server par upload hui PDF file ka path
- * @param {string} documentTitle - Document ka naam (e.g., "Brand Guidelines 2026")
+ * Safe PDF text extraction using pdf2json with URI error protection
+ */
+function extractTextFromPDF(filePath) {
+    return new Promise((resolve, reject) => {
+        const pdfParser = new PDFParser(null, 1); // 1 = text extraction mode
+
+        pdfParser.on("pdfParser_dataError", (errData) => {
+            reject(new Error(errData.parserError || "PDF parsing failed"));
+        });
+
+        pdfParser.on("pdfParser_dataReady", (pdfData) => {
+            try {
+                let extractedText = "";
+                if (pdfData && pdfData.Pages) {
+                    pdfData.Pages.forEach((page) => {
+                        page.Texts.forEach((textObj) => {
+                            if (textObj.R && textObj.R[0] && textObj.R[0].T) {
+                                let rawText = textObj.R[0].T;
+                                try {
+                                    // Safe decode to prevent URI malformed crashes on special symbols/percentages
+                                    extractedText += decodeURIComponent(rawText) + " ";
+                                } catch (e) {
+                                    extractedText += rawText + " ";
+                                }
+                            }
+                        });
+                    });
+                }
+                resolve(extractedText.trim());
+            } catch (err) {
+                reject(err);
+            }
+        });
+
+        pdfParser.loadPDF(filePath);
+    });
+}
+
+/**
+ * PDF file ko process karke chunks banata hai aur MongoDB mein bulk save karta hai.
  */
 async function processAndIngestPDF(filePath, documentTitle) {
     try {
-        console.log(`📄 Reading PDF file: ${filePath}...`);
+        console.log(`📄 Reading PDF file with pdf2json: ${filePath}...`);
         
-        // 1. PDF file ko read karo
-        const dataBuffer = fs.readFileSync(filePath);
-        const pdfData = await pdfParse(dataBuffer);
-        const extractedText = pdfData.text;
+        const extractedText = await extractTextFromPDF(filePath);
 
         if (!extractedText || extractedText.trim().length === 0) {
             throw new Error("No text could be extracted from the PDF.");
@@ -25,37 +58,48 @@ async function processAndIngestPDF(filePath, documentTitle) {
 
         console.log(`✅ Text extracted successfully. Total characters: ${extractedText.length}`);
 
-        // 2. Chunks aur Overlap banao (e.g., Chunk size: 500 chars, Overlap: 100 chars)
+        // Chunks aur Overlap banao (Chunk size: 500 chars, Overlap: 100 chars)
         const textChunks = createChunks(extractedText, 500, 100);
         console.log(`✂️ Generated ${textChunks.length} chunks with overlap.`);
 
-        let savedCount = 0;
+        let allChunkDocuments = [];
+        const BATCH_SIZE = 5; // Parallel processing batch size
 
-        // 3. Har chunk ke liye embedding banao aur DB mein save karo
-        for (const [index, chunkText] of textChunks.entries()) {
-            console.log(`🔄 Processing chunk ${index + 1} of ${textChunks.length}...`);
-            
-            const embedding = await generateEmbedding(chunkText);
+        // Batches mein parallel embeddings generate karo
+        for (let i = 0; i < textChunks.length; i += BATCH_SIZE) {
+            const batch = textChunks.slice(i, i + BATCH_SIZE);
+            console.log(`🔄 Processing batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(textChunks.length / BATCH_SIZE)}...`);
 
-            await GuidelineChunk.create({
-                documentTitle: documentTitle,
-                chunkText: chunkText,
-                embedding: embedding
+            const embeddingPromises = batch.map(async (chunkText) => {
+                const embedding = await generateEmbedding(chunkText);
+                return {
+                    documentTitle: documentTitle,
+                    chunkText: chunkText,
+                    embedding: embedding
+                };
             });
 
-            savedCount++;
+            const batchResults = await Promise.all(embeddingPromises);
+            allChunkDocuments.push(...batchResults);
         }
 
-        // 4. Cleanup: Uploaded local temporary file ko delete kar do
-        fs.unlinkSync(filePath);
+        // MongoDB mein bulk insert
+        console.log(`💾 Saving ${allChunkDocuments.length} chunks to MongoDB Atlas...`);
+        await GuidelineChunk.insertMany(allChunkDocuments);
 
-        console.log(` Successfully ingested ${savedCount} chunks into MongoDB!`);
-        return { success: true, totalChunks: savedCount };
+        // Temporary local file cleanup
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+        }
+
+        console.log(`🎉 Successfully ingested ${allChunkDocuments.length} chunks into MongoDB!`);
+        return { success: true, totalChunks: allChunkDocuments.length };
 
     } catch (error) {
         console.error('Ingestion Error:', error.message);
-        // Agar file exist karti hai toh error aane par bhi delete kar do taaki space na bhare
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+        }
         throw error;
     }
 }

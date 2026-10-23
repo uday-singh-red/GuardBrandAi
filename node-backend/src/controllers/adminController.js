@@ -1,45 +1,36 @@
-const fs = require('fs');
-const GuidelineChunk = require('../models/GuidelineChunk');
-const { generateEmbedding } = require('../services/geminiService');
 
-exports.uploadAndEmbedFile = async (req, res) => {
+// src/controllers/adminController.js
+const { processAndIngestPDF } = require('../services/ingestService');
+
+exports.uploadGuidelinePDF = async (req, res) => {
     try {
+        // Check karo ki file aayi hai ya nahi
         if (!req.file) {
-            return res.status(400).json({ success: false, error: 'No file uploaded.' });
-        }
-
-        const title = req.body.title || req.file.originalname;
-        const filePath = req.file.path;
-
-        console.log(`📂 Reading uploaded file: ${req.file.originalname}`);
-
-        // File ka text read karo
-        const fileContent = fs.readFileSync(filePath, 'utf-8');
-
-        // Chunks mein todo
-        const chunks = fileContent.split('\n').filter(chunk => chunk.trim().length > 10);
-        let savedCount = 0;
-
-        for (const chunk of chunks) {
-            const embedding = await generateEmbedding(chunk);
-            await GuidelineChunk.create({
-                documentTitle: title,
-                chunkText: chunk,
-                embedding: embedding
+            return res.status(400).json({ 
+                success: false, 
+                error: 'No PDF file uploaded. Please attach a PDF under the "pdf" field.' 
             });
-            savedCount++;
         }
 
-        // Temp file delete karo
-        fs.unlinkSync(filePath);
+        const filePath = req.file.path; // Multer ne jahan file save ki hai
+        const documentTitle = req.body.title || req.file.originalname;
+
+        console.log(` Processing upload request for: ${documentTitle}`);
+
+        // Ingestion service ko call karo jo text nikal kar chunks aur embeddings banayegi
+        const result = await processAndIngestPDF(filePath, documentTitle);
 
         return res.status(200).json({
             success: true,
-            message: `File processed! Saved ${savedCount} vector chunks to MongoDB.`
+            message: 'PDF successfully processed, chunked, and stored in vector database!',
+            data: result
         });
 
     } catch (error) {
-        console.error('❌ File Upload Error:', error.message);
-        return res.status(500).json({ success: false, error: 'Failed to process file embeddings.' });
+        console.error(' Admin Upload Controller Error:', error);
+        return res.status(500).json({ 
+            success: false, 
+            error: error.message || 'Internal Server Error during PDF ingestion.' 
+        });
     }
 };

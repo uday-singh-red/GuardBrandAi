@@ -1,6 +1,43 @@
-// src/utils/inputParser.js
 const fs = require('fs');
-const pdfParse = require('pdf-parse');
+const PDFParser = require('pdf2json');
+
+/**
+ * Safe PDF text extraction helper for user input audits
+ */
+function parsePDFFile(filePath) {
+    return new Promise((resolve, reject) => {
+        const pdfParser = new PDFParser(null, 1);
+
+        pdfParser.on("pdfParser_dataError", (errData) => {
+            reject(new Error(errData.parserError || "PDF parsing failed in inputParser"));
+        });
+
+        pdfParser.on("pdfParser_dataReady", (pdfData) => {
+            try {
+                let extractedText = "";
+                if (pdfData && pdfData.Pages) {
+                    pdfData.Pages.forEach((page) => {
+                        page.Texts.forEach((textObj) => {
+                            if (textObj.R && textObj.R[0] && textObj.R[0].T) {
+                                let rawText = textObj.R[0].T;
+                                try {
+                                    extractedText += decodeURIComponent(rawText) + " ";
+                                } catch (e) {
+                                    extractedText += rawText + " ";
+                                }
+                            }
+                        });
+                    });
+                }
+                resolve(extractedText.trim());
+            } catch (err) {
+                reject(err);
+            }
+        });
+
+        pdfParser.loadPDF(filePath);
+    });
+}
 
 /**
  * User input ko parse karta hai chahe wo direct text ho, .txt file ho, ya .pdf file ho.
@@ -15,10 +52,8 @@ async function parseUserInput(req) {
 
         try {
             if (mimeType === 'application/pdf') {
-                console.log('📄 Parsing uploaded PDF file...');
-                const dataBuffer = fs.readFileSync(filePath);
-                const pdfData = await pdfParse(dataBuffer);
-                rawText = pdfData.text;
+                console.log('📄 Parsing uploaded PDF file with pdf2json...');
+                rawText = await parsePDFFile(filePath);
             } else if (mimeType === 'text/plain') {
                 console.log('📝 Reading uploaded Text (.txt) file...');
                 rawText = fs.readFileSync(filePath, 'utf8');
