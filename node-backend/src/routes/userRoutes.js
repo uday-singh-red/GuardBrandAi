@@ -1,7 +1,12 @@
+// src/routes/userRoutes.js
 const express = require('express');
 const router = express.Router();
-const userController = require('../controllers/userController');
+const multer = require('multer');
+const { auditUserContent } = require('../controllers/userController');
 
-router.post('/audit-blog', userController.auditUserBlog);
+const upload = multer({ dest: 'uploads/' });
+
+// POST route: /api/user/audit (Supports both JSON text and multipart file upload under 'file' field)
+router.post('/audit', upload.single('file'), auditUserContent);
 
 module.exports = router;
