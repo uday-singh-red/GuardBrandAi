@@ -6,7 +6,7 @@ require('dotenv').config();
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 const generateEmbedding = async (text,userKey) => {
-    const api = new GoogleGenAI({apiKey:userKey});
+    const api = new GoogleGenAI({apiKey:userKey || process.env.GEMINI_API_KEY  });
     try {
         const response = await api.models.embedContent({
             model: 'gemini-embedding-2', // Official current embedding model
