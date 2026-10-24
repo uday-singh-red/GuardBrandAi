@@ -16,8 +16,18 @@ app.use('/api/admin', adminRoutes);
 const userRoutes = require('./routes/userRoutes');
 app.use('/api/user', userRoutes);
 
+const auditRoutes = require('./routes/auditRoutes');
+app.use('/api', auditRoutes); 
+
+const submissionRoutes = require('./routes/submissionRoutes'); // (Apne path ke hisab se check kar lena)
+
+// 4. Mount Routes (Yahan connect hota hai!)
+app.use('/api/submissions', submissionRoutes);
+
 app.get('/', (req, res) => {
     res.json({ message: "GuardBrand AI RAG Backend Active" });
 });
+
+
 
 module.exports = app;

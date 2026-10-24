@@ -61,16 +61,15 @@ async function parseUserInput(req) {
                 throw new Error('Unsupported file format. Please upload a PDF or TXT file.');
             }
         } finally {
-            // Cleanup: File read karne ke baad server se delete kar do
             if (fs.existsSync(filePath)) {
                 fs.unlinkSync(filePath);
             }
         }
     } 
-    // 2. Agar user ne JSON body mein seedha text bheja hai
-    else if (req.body && req.body.blogText) {
+    // 2. Agar user ne JSON body mein seedha text bheja hai (Fixed condition!)
+    else if (req.body && (req.body.content || req.body.blogText)) {
         console.log('💬 Processing direct text input...');
-        rawText = req.body.blogText;
+        rawText = req.body.content || req.body.blogText; // Dono mein se jo bhi mil jaye
     }
 
     if (!rawText || rawText.trim().length === 0) {

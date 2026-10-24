@@ -46,7 +46,7 @@ function extractTextFromPDF(filePath) {
 /**
  * PDF file ko process karke chunks banata hai aur MongoDB mein bulk save karta hai.
  */
-async function processAndIngestPDF(filePath, documentTitle) {
+async function processAndIngestPDF(filePath, documentTitle, userKey) {
     try {
         console.log(`📄 Reading PDF file with pdf2json: ${filePath}...`);
         
@@ -71,7 +71,7 @@ async function processAndIngestPDF(filePath, documentTitle) {
             console.log(`🔄 Processing batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(textChunks.length / BATCH_SIZE)}...`);
 
             const embeddingPromises = batch.map(async (chunkText) => {
-                const embedding = await generateEmbedding(chunkText);
+                const embedding = await generateEmbedding(chunkText,userKey);
                 return {
                     documentTitle: documentTitle,
                     chunkText: chunkText,

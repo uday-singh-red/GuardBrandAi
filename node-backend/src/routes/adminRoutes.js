@@ -41,4 +41,14 @@ const upload = multer({
 // POST Route: /api/admin/upload
 router.post('/upload', upload.single('pdf'), uploadGuidelinePDF);
 
+router.get('/upload', async (req, res) => {
+  try {
+    // Apne Database/Guideline model se documents fetch karein
+    // const guidelines = await Guideline.find().sort({ createdAt: -1 });
+    res.json({ success: true, guidelines: [] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 module.exports = router;

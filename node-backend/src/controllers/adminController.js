@@ -4,6 +4,8 @@ const { processAndIngestPDF } = require('../services/ingestService');
 
 exports.uploadGuidelinePDF = async (req, res) => {
     try {
+
+        const customApiKey = req.headers['x-api-key'] || '';
         // Check karo ki file aayi hai ya nahi
         if (!req.file) {
             return res.status(400).json({ 
@@ -18,7 +20,7 @@ exports.uploadGuidelinePDF = async (req, res) => {
         console.log(` Processing upload request for: ${documentTitle}`);
 
         // Ingestion service ko call karo jo text nikal kar chunks aur embeddings banayegi
-        const result = await processAndIngestPDF(filePath, documentTitle);
+        const result = await processAndIngestPDF(filePath, documentTitle,customApiKey);
 
         return res.status(200).json({
             success: true,

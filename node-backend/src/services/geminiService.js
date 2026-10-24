@@ -5,9 +5,10 @@ require('dotenv').config();
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-const generateEmbedding = async (text) => {
+const generateEmbedding = async (text,userKey) => {
+    const api = new GoogleGenAI({apiKey:userKey});
     try {
-        const response = await ai.models.embedContent({
+        const response = await api.models.embedContent({
             model: 'gemini-embedding-2', // Official current embedding model
             contents: text,
         });
@@ -58,38 +59,40 @@ const findRelevantGuidelines = async (userQueryText) => {
 };
 
 // 3. Function to Audit User Text using Retrieved Guidelines + Gemini LLM
-const auditWithGeminiLLM = async (userText, retrievedRules) => {
+const auditWithGeminiLLM = async (prompt,userApiKey) => {
+
     try {
-        // Format retrieved rules into a context string
-        const contextText = retrievedRules.map(r => `- ${r.chunkText}`).join('\n');
 
-        const prompt = `
-        You are GuardBrand AI, an enterprise brand compliance officer.
-        Analyze the following user text against the official company guidelines provided below.
+        const Api = new GoogleGenAI({apiKey:userApiKey})
 
-        OFFICIAL GUIDELINES (Retrieved via RAG):
-        ${contextText}
-
-        USER TEXT TO AUDIT:
-        "${userText}"
-
-        Task: Check if the user text violates any of the official guidelines. 
-        Respond strictly in JSON format with the following keys:
-        - status: "PASSED" or "FLAGGED"
-        - complianceScore: a score out of 100 (e.g. "90/100")
-        - violations: array of strings describing violations (empty if passed)
-        - recommendation: short feedback for the user
-        `;
-
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+        const response = await Api.models.generateContent({
+            model: 'gemini-3.8-flash',
             contents: prompt,
+            config: {
+                responseMimeType: "application/json" 
+            }
         });
 
-        // Clean and parse JSON response from LLM
+        console.log("response a gaya")
         let rawText = response.text.trim();
-        if (rawText.startsWith('```json')) {
-            rawText = rawText.replace(/^```json/, '').replace(/```$/, '').trim();
+
+        console.log(rawText);
+
+        rawText = response.text || response.candidates[0].content.parts[0].text;
+
+        // 1. Agar markdown code blocks hain toh unhe hatao
+        if (rawText.includes('```json')) {
+            rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+        } else if (rawText.includes('```')) {
+            rawText = rawText.replace(/```/g, '').trim();
+        }
+
+        // 2. Fallback: Agar phir bhi extra text/headings aa rahi hain, toh sirf pehle '{' aur akhri '}' ke beech ka hissa uthao
+        const firstOpenBrace = rawText.indexOf('{');
+        const lastCloseBrace = rawText.lastIndexOf('}');
+        
+        if (firstOpenBrace !== -1 && lastCloseBrace !== -1 && lastCloseBrace > firstOpenBrace) {
+            rawText = rawText.substring(firstOpenBrace, lastCloseBrace + 1);
         }
 
         return JSON.parse(rawText);
