@@ -311,3 +311,54 @@ exports.resendOTP = async (req, res) => {
     res.status(500).json({ success: false, message: "Server error while resending OTP." });
   }
 };
+
+// ==========================================
+// 5. CHECK AUTH STATUS (Get Current User)
+// ==========================================
+exports.checkAuth = async (req, res) => {
+  try {
+    // req.user humein 'protect' middleware se mil jayega
+    const user = await User.findById(req.user.userId).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
+
+    res.status(200).json({
+      success: true,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email
+      }
+    });
+
+  } catch (error) {
+    console.error("Check Auth Error:", error);
+    res.status(500).json({ success: false, message: "Server error during auth check." });
+  }
+};
+
+// ==========================================
+// 6. LOGOUT USER (Clear Cookie)
+// ==========================================
+exports.logoutUser = async (req, res) => {
+  try {
+    // Cookie ko clear karne ke liye uska time zero (turant expire) kar dete hain
+    res.cookie('token', '', {
+      httpOnly: true,
+      expires: new Date(0), // Turant expire kar dega
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Logged out successfully!"
+    });
+
+  } catch (error) {
+    console.error("Logout Error:", error);
+    res.status(500).json({ success: false, message: "Server error during logout." });
+  }
+};

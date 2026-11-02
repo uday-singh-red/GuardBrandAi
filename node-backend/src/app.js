@@ -3,8 +3,6 @@ const cors = require('cors');
 const connectDB = require('./config/db');
 const cookieParser = require('cookie-parser');
 
-
-
 require('dotenv').config();
 
 const app = express();
@@ -12,11 +10,24 @@ connectDB(); // Connect to MongoDB
 
 app.use(cookieParser());
 
-const frontendUrl = 'http://localhost:5173' || process.env.CLIENT_URL;
+// Whitelist allowed origins (Localhost aur Vercel dono ke liye)
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://guard-brand-ai.vercel.app',
+  process.env.CLIENT_URL // Render environment variable se bhi utha lega
+].filter(Boolean); // Agar koi undefined ho toh hata dega
 
 app.use(cors({
-  origin: frontendUrl,
-  credentials: true,
+  origin: function (origin, callback) {
+    // Postman ya server-to-server requests ke liye jinka origin nahi hota
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) === -1) {
+      return callback(new Error('CORS policy violation: This origin is not allowed.'), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true, // Cookies aur credentials ke liye bohot zaroori hai
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
