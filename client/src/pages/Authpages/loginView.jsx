@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { loginAPI } from '../../services/AuthServices';
 import './Auth.css';
 
-export default function LoginView() {
+export default function LoginView({onLoginSuccess} ) {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -35,6 +35,7 @@ export default function LoginView() {
       const response = await loginAPI(formData);
 
       if (response.success) {
+        onLoginSuccess();
         navigate('/dashboard');
       } else {
         setError(response.message);

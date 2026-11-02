@@ -25,9 +25,16 @@ export const loginAPI = async (loginData) => {
   });
 };
 
+// Check Authentication
+export const checkAuthAPI = async () => {
+  return await apiRequest('/api/user/check-auth', {
+    method: 'GET',
+  });
+};
+
 // Logout
 export const logoutAPI = async () => {
-  return await apiRequest('/api/auth/logout', {
+  return await apiRequest('/api/user/logout', {
     method: 'POST',
   });
 };

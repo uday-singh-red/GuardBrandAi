@@ -5,14 +5,38 @@ import {
   FaUserEdit,
   FaUserShield,
   FaFileUpload,
+  FaSignOutAlt,
 } from 'react-icons/fa';
+
+import { useNavigate } from 'react-router-dom';
 
 import CreatorView from '../pages/CreaterView';
 import AdminView from '../pages/AdminView';
 import GuidelineUploadView from '../pages/GuidelineUploadView';
 
-export default function DashboardPage() {
+import { logoutAPI } from '../services/AuthServices';
+
+export default function DashboardPage({ onLogoutSuccess }) {
   const [activeTab, setActiveTab] = useState('creator');
+  const [loading, setLoading] = useState(false);
+
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      setLoading(true);
+
+      await logoutAPI();
+
+      onLogoutSuccess();
+      navigate('/login', { replace: true });
+
+    } catch (error) {
+      console.error('Logout failed:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="dashboard-page">
@@ -60,6 +84,16 @@ export default function DashboardPage() {
           >
             <FaFileUpload />
             RAG Knowledge Base
+          </button>
+
+          <button
+            type="button"
+            className="nav-btn logout-btn"
+            onClick={handleLogout}
+            disabled={loading}
+          >
+            <FaSignOutAlt />
+            {loading ? 'Logging out...' : 'Logout'}
           </button>
 
         </div>
