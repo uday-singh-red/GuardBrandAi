@@ -1,13 +1,28 @@
 const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
+const cookieParser = require('cookie-parser');
+
+
 
 require('dotenv').config();
 
 const app = express();
 connectDB(); // Connect to MongoDB
 
-app.use(cors());
+app.use(cookieParser());
+
+const frontendUrl = 'http://localhost:5173' || process.env.CLIENT_URL;
+
+app.use(cors({
+  origin: frontendUrl,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+
+
 app.use(express.json());
 
 const adminRoutes = require('./routes/adminRoutes');
